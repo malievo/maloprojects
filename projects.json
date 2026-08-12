@@ -1,0 +1,12 @@
+{
+  "projects": [
+    {
+      "id": "my-web-app",
+      "name": "Мое веб-приложение",
+      "description": "Крутое веб-приложение на Flask",
+      "repo": "https://github.com/CherretGit/zaprett-app",
+      "version": "1.0.0",
+      "dependencies": ["flask", "requests"]
+    }
+  ]
+}
