@@ -1,0 +1,88 @@
+"""
+ai_provider.py — обёртка над облачной LLM для классификатора SMOS
+«команда / разговор» (bootstrap-этап, см. model_combination_design.md).
+
+Единственная точка в проекте, которая знает, что сейчас используется
+именно GigaChat. Если понадобится сменить провайдера — меняется только
+этот файл, сигнатура ai_classify(text) наружу остаётся прежней.
+
+Установка: pip install gigachat python-dotenv
+Ключ доступа берётся из переменной окружения GIGACHAT_CREDENTIALS —
+положите его в файл user/.env в корне проекта (GIGACHAT_CREDENTIALS=...).
+Это общий секрет облачных провайдеров (тот же ключ использует SWL);
+user/.env в .gitignore, так что ключ не попадёт в git. Путь к нему
+находит config.user_env_file(). Остальные настройки (модель,
+temperature и т.п.) — в user/configs/classifier.json, см. config.py.
+"""
+
+import os
+import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
+from gigachat import GigaChat
+from gigachat.models import Chat, Messages, MessagesRole
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import config  # noqa: E402
+
+_env_file = config.user_env_file(SCRIPT_DIR)
+if _env_file:
+    load_dotenv(_env_file)
+CFG = config.load(SCRIPT_DIR)
+
+SYSTEM_PROMPT = (
+    "Ты — классификатор коротких голосовых фраз для голосового "
+    "ассистента. Определи, эта фраза — КОМАНДА или ОБЩЕНИЕ.\n\n"
+    "КОМАНДА — пользователь хочет, чтобы система что-то СДЕЛАЛА: "
+    "выполнила действие (\"включи свет\", \"поставь таймер на пять "
+    "минут\") ИЛИ получила/вычислила конкретные данные (\"какая "
+    "погода\", \"который час\", \"сколько будет 2 плюс 2\", \"переведи "
+    "привет на английский\"). Если для честного ответа системе нужно "
+    "посмотреть или посчитать актуальные данные, а не просто "
+    "поддержать разговор — это команда, даже если по форме это "
+    "вопрос.\n\n"
+    "ОБЩЕНИЕ — разговор с ассистентом как с другом: вопросы про самого "
+    "ассистента (\"как дела\", \"что думаешь про людей\", \"тебе "
+    "нравится музыка\"), эмоции, светская беседа, просьбы "
+    "рассказать что-то от себя (анекдот, стих) — где не требуется "
+    "смотреть/вычислять реальные данные.\n\n"
+    "Ответь строго одним словом, без пояснений и знаков препинания: "
+    "command или chat."
+)
+
+
+def ai_classify(text: str) -> str:
+    """Отправляет фразу в GigaChat, возвращает 'command' или 'chat'.
+
+    Намеренно без доп. логики (retries, кэш и т.п.) — это MVP-обёртка,
+    усложнять раньше времени не нужно (см. model_combination_design.md).
+    При неожиданном ответе модели бросает ValueError — лучше сразу
+    увидеть, что модель не послушалась промта, чем молча считать это
+    каким-то из двух классов по умолчанию.
+    """
+    payload = Chat(
+        messages=[
+            Messages(role=MessagesRole.SYSTEM, content=SYSTEM_PROMPT),
+            Messages(role=MessagesRole.USER, content=text),
+        ],
+        temperature=CFG["ai"]["temperature"],
+        max_tokens=CFG["ai"]["max_tokens"],
+    )
+
+    with GigaChat(
+        credentials=os.environ["GIGACHAT_CREDENTIALS"],
+        model=CFG["ai"]["model"],
+        verify_ssl_certs=CFG["ai"]["verify_ssl_certs"],
+    ) as giga:
+        response = giga.chat(payload)
+
+    label = response.choices[0].message.content.strip().lower()
+
+    if label not in ("command", "chat"):
+        raise ValueError(f"GigaChat вернул неожиданную метку: {label!r}")
+
+    return label

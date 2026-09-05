@@ -1,0 +1,47 @@
+__pycache__/
+*.pyc
+.venv/
+.idea/
+.env
+
+# папка пользователя. user/configs/ — под гитом: в репозитории лежат
+# значения по умолчанию, локальные правки для тестов просто не
+# коммитятся. Остальное в user/ — личное, вне репозитория.
+user/modules/*
+user/memory/*
+user/module_data/*
+user/.env
+
+# рантайм-данные (генерируются при работе, не исходный код)
+system/fwl/rvs/flags/*
+system/fwl/rvs/output/*
+system/fwl/rvs/debug_audio/*
+system/fwl/classifier/output/*
+system/fwl/classifier/flags/*
+system/core/module_init/output/*
+system/core/tasks/*
+system/core/goals/*
+system/outputstructurizer/queue/*
+system/outputstructurizer/output/*
+system/audio/tasks/*
+system/swl/output/*
+logs/raw/*
+
+# system/sysaudio/: clips/ коммитятся (ассеты), а models/ — локальный кэш
+# голосовой модели Piper (~60 МБ, качается generate.py), voice_samples/ —
+# временная папка сравнения голосов. См. system/sysaudio/sysaudio_design.md.
+system/sysaudio/models/*
+system/sysaudio/voice_samples/*
+system/sysaudio/tasks/*
+
+# рантайм-состояние launcher'а и апдейтера — вне system/ намеренно (см.
+# updater/updater_design.md), но всё равно не исходный код
+launcher/run/*
+updater/backup/*
+updater/tmp_download.zip
+updater/tmp_extract/*
+updater/state.json
+updater/dialog_procs.json
+updater/history.jsonl
+
+!**/.gitkeep
